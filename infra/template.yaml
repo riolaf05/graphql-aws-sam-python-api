@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  graphql api for Note system
+
+  Sample SAM Template for appsync-Note-api-example
+  
+
+Parameters:
+  APIName:
+    Type: String
+    Description: The name for the AppSync GraphQL API to be created.
+    Default: Note API
+
+Resources:
+
+  AppSyncApiKey:
+    Type: AWS::AppSync::ApiKey
+    Properties:
+      ApiId: !GetAtt AppSyncNoteAPI.ApiId
+
+  AppSyncNoteAPI:
+    Type: AWS::AppSync::GraphQLApi
+    Properties:
+      Name: !Sub ${APIName}
+      AuthenticationType: API_KEY
+
+  AppSyncNoteSchema:
+    Type: AWS::AppSync::GraphQLSchema
+    DependsOn:
+      - AppSyncNoteAPI
+    Properties:
+      ApiId: !GetAtt AppSyncNoteAPI.ApiId
+      DefinitionS3Location: ./src/schema.graphql #One of the advantages of using SAM is that you can define the schema in a local file without the need to manually upload it on S3
+
+  NoteTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+
+  NoteTableDataSource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt AppSyncNoteAPI.ApiId
+      Name: NoteTableDataSource
+      Type: AMAZON_DYNAMODB
+      ServiceRoleArn: !GetAtt AppSyncDataSourceRole.Arn
+      DynamoDBConfig:
+        TableName: !Ref NoteTable
+        AwsRegion: !Ref AWS::Region
+
+
+  AppSyncDataSourceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: appsync.amazonaws.com
+      Policies:
+        - PolicyName: DataSourceDynamoPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:*
+                Resource: 
+                  - !GetAtt NoteTable.Arn
+
+
+  GetSingleNoteResolver:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncNoteAPI.ApiId
+      CodeS3Location: ./src/resolvers/getSingleNote.js
+      FieldName: getSingleNote
+      TypeName: Query
+      DataSourceName: !GetAtt NoteTableDataSource.Name
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+
+
+  GetAllNotesResolver:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncNoteAPI.ApiId
+      CodeS3Location: ./src/resolvers/getAllNotes.js
+      FieldName: getAllNotes
+      TypeName: Query
+      DataSourceName: !GetAtt NoteTableDataSource.Name
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+
+
+  CreateSingleNoteResolver:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncNoteAPI.ApiId
+      CodeS3Location: ./src/resolvers/createSingleNote.js
+      FieldName: createSingleNote
+      TypeName: Mutation
+      DataSourceName: !GetAtt NoteTableDataSource.Name
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0

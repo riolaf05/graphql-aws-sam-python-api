@@ -1,0 +1,23 @@
+type Note {
+  id: ID!
+  date: AWSDateTime
+  title: String
+  extraction: String
+  summary: String
+  bulletPoints: String
+}
+
+type Query {
+  getAllNotes: [Note]
+  getSingleNote(id: ID!): Note
+}
+
+type Mutation {
+  createSingleNote(
+    date: AWSDateTime
+    title: String
+    extraction: String
+    summary: String
+    bulletPoints: String
+  ): Note
+}
